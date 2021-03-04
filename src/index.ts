@@ -119,9 +119,11 @@ export function clientToHTMLElementCoords(
 export function clientToSVGElementCoords(
 	el: SVGSVGElement,
 	coords: Coords
-): Coords {
+): Coords | null {
 	const element: SVGSVGElement = !el.ownerSVGElement ? el : el.ownerSVGElement;
-	const screen_to_el = element.getScreenCTM()?.inverse();
+	const elScreenCTM = element.getScreenCTM();
+	if (!elScreenCTM) return null;
+	const screen_to_el = elScreenCTM.inverse();
 	const point = element.createSVGPoint();
 	point.x = coords.x;
 	point.y = coords.y;
