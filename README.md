@@ -1,8 +1,7 @@
-# ok-zoomer
+# two-fingers
 
-Okay ways to pinch-zoom on the web.
+A package to help you with two fingers gestures on the web.
 
-You'll find here:
-
-- a [Typescript implementation](./src/index.ts);
-- an [event debug page](https://danburzo.github.io/ok-zoomer/tools/debug).
+This is an adaptation of the research, article and code by @danburzo:
+- [Article](https://dev.to/danburzo/pinch-me-i-m-zooming-gestures-in-the-dom-a0e)
+- [Github repo](https://github.com/danburzo/ok-zoomer)
