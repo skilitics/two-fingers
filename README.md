@@ -9,7 +9,7 @@ This is an adaptation of the research, article and code by @danburzo:
 
 ### TL;DR   
 Two fingers gestures have become very common on the web, mostly to enable zooming and panning.
-But they are passed as different events depending on:
+But they are passed to browsers as different events depending on:
 - the hardware on which they are performed (trackpad OR touchscreen)
 - the OS and browser that interprets them
 
@@ -31,13 +31,13 @@ The API takes inspiration from Apple's [`GestureEvent` specification](https://de
 ```javascript
 const myDiv = document.querySelector('#myDiv');
 const unregister = twoFingers(myDiv, {
-  gestureStart: (g) => console.log(`Gesture start. Event: ${g.toString()}`),
-  gestureChange: (g) => console.log(`Gesture change. Event: ${g.toString()}`),
-  gestureEnd: (g) => console.log(`Gesture end. Event: ${g.toString()}`),
+  gestureStart: (g) => console.log(`Gesture start. Gesture: ${g.toString()}`),
+  gestureChange: (g) => console.log(`Gesture change. Gesture: ${g.toString()}`),
+  gestureEnd: (g) => console.log(`Gesture end. Gesture: ${g.toString()}`),
 });
 ```
 
-The callbacks are passed an object as argument, that is of the `Gesture` TS type:
+The callbacks are passed a `Gesture` argument of the following TS type:
 ```typescript
 type Gesture = {
   origin: Coords;
