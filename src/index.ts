@@ -1,219 +1,166 @@
-declare global {
-  /*
-    TouchEvent' `scale` and `rotation` properties aren't standardized:
-    https://developer.mozilla.org/en-US/docs/Web/API/TouchEvent
-  */
-  interface TouchEvent {
-    scale?: number;
-    rotation?: number;
-  }
+export * from "./types";
+import type { Coords, DeltaConfig, Gesture, GestureCallbacks, WheelConfig } from "./types";
 
-  /*
-    GestureEvents aren't standardized:
-    https://developer.mozilla.org/en-US/docs/Web/API/GestureEvent
-    https://developer.apple.com/documentation/webkitjs/gestureevent
-  */
-  interface GestureEvent extends UIEvent {
-    altKey: boolean;
-    ctrlKey: boolean;
-    metaKey: boolean;
-    shiftKey: boolean;
-    scale: number;
-    rotation: number;
-    clientX: number;
-    clientY: number;
-    screenX: number;
-    screenY: number;
-  }
-  // extends the original ElementEventMap
-  interface ElementEventMap {
-    gesturestart: GestureEvent;
-    gesturechange: GestureEvent;
-    gestureend: GestureEvent;
-  }
-  // required to check for its existence
-  interface Window {
-    GestureEvent?: GestureEvent;
-  }
-}
+const limit = (delta: number, maxDelta: number) => Math.sign(delta) * Math.min(maxDelta, Math.abs(delta));
 
-export type Gesture = {
-  origin: Coords;
-  translation: Coords;
-  scale: number;
-  rotation?: number;
-};
+const normalizeWheel = (
+  { deltaMode, deltaX, deltaY, shiftKey }: WheelEvent,
+  { lineMultiplier, pageMultiplier, maxMultiplier }: DeltaConfig,
+): [number, number] => {
+  let dx = deltaX;
+  let dy = deltaY;
 
-export type Coords = {
-  x: number;
-  y: number;
-};
-
-type Callbacks = {
-  gestureStart?: (gesture: Gesture) => void;
-  gestureChange?: (gesture: Gesture) => void;
-  gestureEnd?: (gesture: Gesture) => void;
-};
-
-const WHEEL_SCALE_SPEEDUP = 2;
-const WHEEL_TRANSLATION_SPEEDUP = 2;
-const DELTA_LINE_MULTIPLIER = 8;
-const DELTA_PAGE_MULTIPLIER = 24;
-const MAX_WHEEL_DELTA = 24;
-
-function normalizeWheel(e: WheelEvent): [number, number] {
-  let dx = e.deltaX;
-  let dy = e.deltaY;
-  if (e.shiftKey && dx === 0) {
-    const tmp = dx;
+  if (shiftKey && dx === 0) {
     dx = dy;
-    dy = tmp;
+    dy = 0;
   }
-  if (e.deltaMode === WheelEvent.DOM_DELTA_LINE) {
-    dx *= DELTA_LINE_MULTIPLIER;
-    dy *= DELTA_LINE_MULTIPLIER;
-  } else if (e.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
-    dx *= DELTA_PAGE_MULTIPLIER;
-    dy *= DELTA_PAGE_MULTIPLIER;
+
+  if (deltaMode === WheelEvent.DOM_DELTA_LINE) {
+    dx *= lineMultiplier;
+    dy *= lineMultiplier;
+  } else if (deltaMode === WheelEvent.DOM_DELTA_PAGE) {
+    dx *= pageMultiplier;
+    dy *= pageMultiplier;
   }
-  return [limit(dx, MAX_WHEEL_DELTA), limit(dy, MAX_WHEEL_DELTA)];
-}
 
-function limit(delta: number, max_delta: number): number {
-  return Math.sign(delta) * Math.min(max_delta, Math.abs(delta));
-}
+  return [limit(dx, maxMultiplier), limit(dy, maxMultiplier)];
+};
 
-function midpoint(touches: TouchList): Coords {
-  const [t1, t2] = touches;
-  return {
-    x: (t1.clientX + t2.clientX) / 2,
-    y: (t1.clientY + t2.clientY) / 2,
-  };
-}
+const midpoint = ([t1, t2]: TouchList): Coords => ({
+  x: (t1.clientX + t2.clientX) / 2,
+  y: (t1.clientY + t2.clientY) / 2,
+});
 
-function distance(touches: TouchList): number {
-  const [t1, t2] = touches;
+const distance = ([t1, t2]: TouchList) => {
   const dx = t2.clientX - t1.clientX;
   const dy = t2.clientY - t1.clientY;
+
   return Math.sqrt(dx * dx + dy * dy);
-}
+};
 
-function angle(touches: TouchList): number {
-  const [t1, t2] = touches;
+const angle = ([t1, t2]: TouchList) => {
   const dx = t2.clientX - t1.clientX;
   const dy = t2.clientY - t1.clientY;
-  return (180 / Math.PI) * Math.atan2(dy, dx);
-}
 
-export function clientToHTMLElementCoords(
-  element: HTMLDivElement,
-  coords: Coords
-): Coords {
+  return (180 / Math.PI) * Math.atan2(dy, dx);
+};
+
+export const clientToHTMLElementCoords = (element: HTMLDivElement, coords: Coords): Coords => {
   const rect = element.getBoundingClientRect();
+
   return {
     x: coords.x - rect.x,
     y: coords.y - rect.y,
   };
-}
+};
 
-export function clientToSVGElementCoords(
-  el: SVGSVGElement,
-  coords: Coords
-): Coords | undefined {
-  const element: SVGSVGElement = !el.ownerSVGElement ? el : el.ownerSVGElement;
-  const elScreenCTM = element.getScreenCTM();
-  if (!elScreenCTM) return undefined;
-  const screen_to_el = elScreenCTM.inverse();
+export const clientToSVGElementCoords = (el: SVGSVGElement, coords: Coords): Coords | undefined => {
+  const element: SVGSVGElement = el.ownerSVGElement ?? el;
+  const coordinateTransformMatrix = element.getScreenCTM();
+
+  if (!coordinateTransformMatrix) return;
+
+  const screenToElement = coordinateTransformMatrix.inverse();
   const point = element.createSVGPoint();
+
   point.x = coords.x;
   point.y = coords.y;
-  return point.matrixTransform(screen_to_el);
-}
 
-export function twoFingers(container: Element, options: Callbacks): () => void {
-  function noop() {
-    /* do nothing */
-  }
+  return point.matrixTransform(screenToElement);
+};
 
-  const gestureStart = options.gestureStart ?? noop;
-  const gestureChange = options.gestureChange ?? noop;
-  const gestureEnd = options.gestureEnd ?? noop;
+export const twoFingers = (
+  container: Element,
+  { onGestureStart, onGestureChange, onGestureEnd }: GestureCallbacks = {},
+  wheelConfig?: WheelConfig,
+): (() => void) => {
+  const scaleSpeedup = wheelConfig?.scaleSpeedup ?? 2;
+  const translationSpeedUp = wheelConfig?.translationSpeedUp ?? 2;
+
+  // note: may expose in the future if needed
+  const deltaConfig: DeltaConfig = {
+    lineMultiplier: 8,
+    pageMultiplier: 24,
+    maxMultiplier: 24,
+  };
 
   // TODO: we shouldn't be reusing gesture
   let gesture: Gesture | undefined = undefined;
   let timer: number;
 
-  function wheelListener(e: WheelEvent) {
+  const wheelListener = (e: WheelEvent) => {
     e.preventDefault();
-    const [dx, dy] = normalizeWheel(e);
+
+    const [dx, dy] = normalizeWheel(e, deltaConfig);
+
     if (!gesture) {
       gesture = {
         scale: 1,
         translation: { x: 0, y: 0 },
         origin: { x: e.clientX, y: e.clientY },
       };
-      gestureStart(gesture);
+      onGestureStart?.(gesture);
     } else {
       gesture = {
         origin: { x: e.clientX, y: e.clientY },
-        scale: e.ctrlKey
-          ? gesture.scale * (1 - (WHEEL_SCALE_SPEEDUP * dy) / 100)
-          : 1,
+        scale: e.ctrlKey ? gesture.scale * (1 - (scaleSpeedup * dy) / 100) : 1,
         translation: !e.ctrlKey
           ? {
-              x: gesture.translation.x - WHEEL_TRANSLATION_SPEEDUP * dx,
-              y: gesture.translation.y - WHEEL_TRANSLATION_SPEEDUP * dy,
+              x: gesture.translation.x - translationSpeedUp * dx,
+              y: gesture.translation.y - translationSpeedUp * dy,
             }
           : { x: 0, y: 0 },
       };
-      gestureChange(gesture);
+
+      onGestureChange?.(gesture);
     }
+
     if (timer) {
       window.clearTimeout(timer);
     }
+
     timer = window.setTimeout(() => {
       if (gesture) {
-        gestureEnd(gesture);
+        onGestureEnd?.(gesture);
         gesture = undefined;
       }
     }, 20);
-  }
+  };
 
-  let initial_touches: TouchList;
-  function touchMove(e: Event) {
+  let initialTouches: TouchList;
+
+  const touchMove = (e: Event) => {
     if (!(e instanceof TouchEvent)) return;
+
     if (e.touches.length === 2) {
-      const mp_init = midpoint(initial_touches);
-      const mp_curr = midpoint(e.touches);
+      const initialMidpoint = midpoint(initialTouches);
+      const currentMidpoint = midpoint(e.touches);
+
       gesture = {
-        scale:
-          e.scale !== undefined
-            ? e.scale
-            : distance(e.touches) / distance(initial_touches),
-        rotation:
-          e.rotation !== undefined
-            ? e.rotation
-            : angle(e.touches) - angle(initial_touches),
+        scale: e.scale !== undefined ? e.scale : distance(e.touches) / distance(initialTouches),
+        rotation: e.rotation !== undefined ? e.rotation : angle(e.touches) - angle(initialTouches),
         translation: {
-          x: mp_curr.x - mp_init.x,
-          y: mp_curr.y - mp_init.y,
+          x: currentMidpoint.x - initialMidpoint.x,
+          y: currentMidpoint.y - initialMidpoint.y,
         },
-        origin: mp_init,
+        origin: initialMidpoint,
       };
-      gestureChange(gesture);
+
+      onGestureChange?.(gesture);
       e.preventDefault();
     }
-  }
+  };
 
-  function watchTouches(e: Event) {
+  const watchTouches = (e: Event) => {
     if (!(e instanceof TouchEvent)) return;
+
     if (e.touches.length === 2) {
-      initial_touches = e.touches;
+      initialTouches = e.touches;
       gesture = {
         scale: 1,
         rotation: 0,
         translation: { x: 0, y: 0 },
-        origin: midpoint(initial_touches),
+        origin: midpoint(initialTouches),
       };
 
       /*
@@ -223,18 +170,19 @@ export function twoFingers(container: Element, options: Callbacks): () => void {
       if (e.type === "touchstart") {
         e.preventDefault();
       }
-      gestureStart(gesture);
+
+      onGestureStart?.(gesture);
       container.addEventListener("touchmove", touchMove, { passive: false });
       container.addEventListener("touchend", watchTouches);
       container.addEventListener("touchcancel", watchTouches);
     } else if (gesture) {
-      gestureEnd(gesture);
+      onGestureEnd?.(gesture);
       gesture = undefined;
       container.removeEventListener("touchmove", touchMove);
       container.removeEventListener("touchend", watchTouches);
       container.removeEventListener("touchcancel", watchTouches);
     }
-  }
+  };
 
   document.addEventListener("wheel", wheelListener, { passive: false });
   container.addEventListener("touchstart", watchTouches, { passive: false });
@@ -243,60 +191,51 @@ export function twoFingers(container: Element, options: Callbacks): () => void {
     GestureEvent handling - Safari only
   */
 
-  function handleGestureStart(e: GestureEvent) {
-    gestureStart({
+  const handleGestureStart = ({ clientX, clientY, rotation, scale, preventDefault }: GestureEvent) => {
+    onGestureStart?.({
       translation: { x: 0, y: 0 },
-      scale: e.scale,
-      rotation: e.rotation,
-      origin: { x: e.clientX, y: e.clientY },
+      scale,
+      rotation,
+      origin: { x: clientX, y: clientY },
     });
-    e.preventDefault();
-  }
 
-  function handleGestureChange(e: GestureEvent) {
-    gestureChange({
+    preventDefault();
+  };
+
+  const handleGestureChange = ({ clientX, clientY, rotation, scale, preventDefault }: GestureEvent) => {
+    onGestureChange?.({
       translation: { x: 0, y: 0 },
-      scale: e.scale,
-      rotation: e.rotation,
-      origin: { x: e.clientX, y: e.clientY },
+      scale,
+      rotation,
+      origin: { x: clientX, y: clientY },
     });
-    e.preventDefault();
-  }
 
-  function handleGestureEnd(e: GestureEvent) {
-    gestureEnd({
+    preventDefault();
+  };
+
+  const handleGestureEnd = ({ clientX, clientY, rotation, scale }: GestureEvent) => {
+    onGestureEnd?.({
       translation: { x: 0, y: 0 },
-      scale: e.scale,
-      rotation: e.rotation,
-      origin: { x: e.clientX, y: e.clientY },
+      scale,
+      rotation,
+      origin: { x: clientX, y: clientY },
     });
-  }
+  };
 
-  if (
-    typeof window.GestureEvent !== "undefined" &&
-    typeof window.TouchEvent === "undefined"
-  ) {
-    container.addEventListener("gesturestart", handleGestureStart, {
-      passive: false,
-    });
-    container.addEventListener("gesturechange", handleGestureChange, {
-      passive: false,
-    });
+  if (typeof window.GestureEvent !== "undefined" && typeof window.TouchEvent === "undefined") {
+    container.addEventListener("gesturestart", handleGestureStart, { passive: false });
+    container.addEventListener("gesturechange", handleGestureChange, { passive: false });
     container.addEventListener("gestureend", handleGestureEnd);
   }
 
-  function unregister() {
+  return () => {
     document.removeEventListener("wheel", wheelListener);
     container.removeEventListener("touchstart", watchTouches);
-    if (
-      typeof window.GestureEvent !== "undefined" &&
-      typeof window.TouchEvent === "undefined"
-    ) {
+
+    if (typeof window.GestureEvent !== "undefined" && typeof window.TouchEvent === "undefined") {
       container.removeEventListener("gesturestart", handleGestureStart);
       container.removeEventListener("gesturechange", handleGestureChange);
       container.removeEventListener("gestureend", handleGestureEnd);
     }
-  }
-
-  return unregister;
-}
+  };
+};
