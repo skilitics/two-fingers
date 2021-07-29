@@ -1,84 +1,18 @@
-declare global {
-  /*
-    TouchEvent' `scale` and `rotation` properties aren't standardized:
-    https://developer.mozilla.org/en-US/docs/Web/API/TouchEvent
-  */
-  interface TouchEvent {
-    scale?: number;
-    rotation?: number;
-  }
+export * from "./types";
+import type { Coords, DeltaConfig, Gesture, GestureCallbacks, WheelConfig } from "./types";
 
-  /*
-    GestureEvents aren't standardized:
-    https://developer.mozilla.org/en-US/docs/Web/API/GestureEvent
-    https://developer.apple.com/documentation/webkitjs/gestureevent
-  */
-  interface GestureEvent extends UIEvent {
-    altKey: boolean;
-    ctrlKey: boolean;
-    metaKey: boolean;
-    shiftKey: boolean;
-    scale: number;
-    rotation: number;
-    clientX: number;
-    clientY: number;
-    screenX: number;
-    screenY: number;
-  }
+const limit = (delta: number, maxDelta: number) => Math.sign(delta) * Math.min(maxDelta, Math.abs(delta));
 
-  // extends the original ElementEventMap
-  interface ElementEventMap {
-    gesturestart: GestureEvent;
-    gesturechange: GestureEvent;
-    gestureend: GestureEvent;
-  }
-
-  // required to check for its existence
-  interface Window {
-    GestureEvent?: GestureEvent;
-  }
-}
-
-export type Coords = {
-  x: number;
-  y: number;
-};
-
-export type Gesture = {
-  origin: Coords;
-  translation: Coords;
-  scale: number;
-  rotation?: number;
-};
-
-type Callbacks = {
-  gestureStart?: (gesture: Gesture) => void;
-  gestureChange?: (gesture: Gesture) => void;
-  gestureEnd?: (gesture: Gesture) => void;
-};
-
-type WheelConfig = {
-  scaleSpeedup: number;
-  translationSpeedUp: number;
-};
-
-type DeltaConfig = {
-  lineMultiplier: number;
-  pageMultiplier: number;
-  maxMultiplier: number;
-};
-
-function normalizeWheel(
+const normalizeWheel = (
   { deltaMode, deltaX, deltaY, shiftKey }: WheelEvent,
   { lineMultiplier, pageMultiplier, maxMultiplier }: DeltaConfig,
-): [number, number] {
+): [number, number] => {
   let dx = deltaX;
   let dy = deltaY;
 
   if (shiftKey && dx === 0) {
-    const tmp = dx;
     dx = dy;
-    dy = tmp;
+    dy = 0;
   }
 
   if (deltaMode === WheelEvent.DOM_DELTA_LINE) {
@@ -90,9 +24,7 @@ function normalizeWheel(
   }
 
   return [limit(dx, maxMultiplier), limit(dy, maxMultiplier)];
-}
-
-const limit = (delta: number, maxDelta: number) => Math.sign(delta) * Math.min(maxDelta, Math.abs(delta));
+};
 
 const midpoint = ([t1, t2]: TouchList): Coords => ({
   x: (t1.clientX + t2.clientX) / 2,
@@ -123,12 +55,12 @@ export const clientToHTMLElementCoords = (element: HTMLDivElement, coords: Coord
 };
 
 export const clientToSVGElementCoords = (el: SVGSVGElement, coords: Coords): Coords | undefined => {
-  const element: SVGSVGElement = !el.ownerSVGElement ? el : el.ownerSVGElement;
-  const elScreenCTM = element.getScreenCTM();
+  const element: SVGSVGElement = el.ownerSVGElement ?? el;
+  const coordinateTransformMatrix = element.getScreenCTM();
 
-  if (!elScreenCTM) return;
+  if (!coordinateTransformMatrix) return;
 
-  const screenToElement = elScreenCTM.inverse();
+  const screenToElement = coordinateTransformMatrix.inverse();
   const point = element.createSVGPoint();
 
   point.x = coords.x;
@@ -137,15 +69,15 @@ export const clientToSVGElementCoords = (el: SVGSVGElement, coords: Coords): Coo
   return point.matrixTransform(screenToElement);
 };
 
-export function twoFingers(
+export const twoFingers = (
   container: Element,
-  { gestureStart, gestureChange, gestureEnd }: Callbacks = {},
+  { onGestureStart, onGestureChange, onGestureEnd }: GestureCallbacks = {},
   wheelConfig?: WheelConfig,
-): () => void {
+): (() => void) => {
   const scaleSpeedup = wheelConfig?.scaleSpeedup ?? 2;
   const translationSpeedUp = wheelConfig?.translationSpeedUp ?? 2;
 
-  // note: may expose if needed
+  // note: may expose in the future if needed
   const deltaConfig: DeltaConfig = {
     lineMultiplier: 8,
     pageMultiplier: 24,
@@ -167,7 +99,7 @@ export function twoFingers(
         translation: { x: 0, y: 0 },
         origin: { x: e.clientX, y: e.clientY },
       };
-      gestureStart?.(gesture);
+      onGestureStart?.(gesture);
     } else {
       gesture = {
         origin: { x: e.clientX, y: e.clientY },
@@ -180,7 +112,7 @@ export function twoFingers(
           : { x: 0, y: 0 },
       };
 
-      gestureChange?.(gesture);
+      onGestureChange?.(gesture);
     }
 
     if (timer) {
@@ -189,7 +121,7 @@ export function twoFingers(
 
     timer = window.setTimeout(() => {
       if (gesture) {
-        gestureEnd?.(gesture);
+        onGestureEnd?.(gesture);
         gesture = undefined;
       }
     }, 20);
@@ -214,7 +146,7 @@ export function twoFingers(
         origin: initialMidpoint,
       };
 
-      gestureChange?.(gesture);
+      onGestureChange?.(gesture);
       e.preventDefault();
     }
   };
@@ -239,12 +171,12 @@ export function twoFingers(
         e.preventDefault();
       }
 
-      gestureStart?.(gesture);
+      onGestureStart?.(gesture);
       container.addEventListener("touchmove", touchMove, { passive: false });
       container.addEventListener("touchend", watchTouches);
       container.addEventListener("touchcancel", watchTouches);
     } else if (gesture) {
-      gestureEnd?.(gesture);
+      onGestureEnd?.(gesture);
       gesture = undefined;
       container.removeEventListener("touchmove", touchMove);
       container.removeEventListener("touchend", watchTouches);
@@ -260,7 +192,7 @@ export function twoFingers(
   */
 
   const handleGestureStart = ({ clientX, clientY, rotation, scale, preventDefault }: GestureEvent) => {
-    gestureStart?.({
+    onGestureStart?.({
       translation: { x: 0, y: 0 },
       scale,
       rotation,
@@ -271,7 +203,7 @@ export function twoFingers(
   };
 
   const handleGestureChange = ({ clientX, clientY, rotation, scale, preventDefault }: GestureEvent) => {
-    gestureChange?.({
+    onGestureChange?.({
       translation: { x: 0, y: 0 },
       scale,
       rotation,
@@ -282,7 +214,7 @@ export function twoFingers(
   };
 
   const handleGestureEnd = ({ clientX, clientY, rotation, scale }: GestureEvent) => {
-    gestureEnd?.({
+    onGestureEnd?.({
       translation: { x: 0, y: 0 },
       scale,
       rotation,
@@ -306,4 +238,4 @@ export function twoFingers(
       container.removeEventListener("gestureend", handleGestureEnd);
     }
   };
-}
+};
