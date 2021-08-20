@@ -72,11 +72,8 @@ export const clientToSVGElementCoords = (el: SVGSVGElement, coords: Coords): Coo
 export const twoFingers = (
   container: Element,
   { onGestureStart, onGestureChange, onGestureEnd }: GestureCallbacks = {},
-  wheelConfig?: WheelConfig,
+  getWheelConfig?: () => WheelConfig,
 ): (() => void) => {
-  const scaleSpeedup = wheelConfig?.scaleSpeedup ?? 2;
-  const translationSpeedUp = wheelConfig?.translationSpeedUp ?? 2;
-
   // note: may expose in the future if needed
   const deltaConfig: DeltaConfig = {
     lineMultiplier: 8,
@@ -90,6 +87,11 @@ export const twoFingers = (
 
   const wheelListener = (e: WheelEvent) => {
     e.preventDefault();
+
+    const { scaleSpeedup, translationSpeedUp } = getWheelConfig?.() ?? {
+      scaleSpeedup: 2,
+      translationSpeedUp: 2,
+    };
 
     const [dx, dy] = normalizeWheel(e, deltaConfig);
 
