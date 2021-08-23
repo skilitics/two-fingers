@@ -1,6 +1,6 @@
 {
   "name": "@skilitics/two-fingers",
-  "version": "0.0.4",
+  "version": "1.0.0",
   "description": "Normalize two fingers gestures on the web.",
   "main": "lib",
   "type": "module",

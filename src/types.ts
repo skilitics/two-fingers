@@ -16,13 +16,7 @@ export type GestureCallbacks = {
   onGestureEnd?: (gesture: Gesture) => void;
 };
 
-export type WheelConfig = {
-  scaleSpeedup: number;
-  translationSpeedUp: number;
-};
-
-export type DeltaConfig = {
-  lineMultiplier: number;
-  pageMultiplier: number;
-  maxMultiplier: number;
+export type NormalizedWheelEvent = {
+  dx: number;
+  dy: number;
 };

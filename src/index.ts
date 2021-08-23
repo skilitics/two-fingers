@@ -1,30 +1,5 @@
 export * from "./types";
-import type { Coords, DeltaConfig, Gesture, GestureCallbacks, WheelConfig } from "./types";
-
-const limit = (delta: number, maxDelta: number) => Math.sign(delta) * Math.min(maxDelta, Math.abs(delta));
-
-const normalizeWheel = (
-  { deltaMode, deltaX, deltaY, shiftKey }: WheelEvent,
-  { lineMultiplier, pageMultiplier, maxMultiplier }: DeltaConfig,
-): [number, number] => {
-  let dx = deltaX;
-  let dy = deltaY;
-
-  if (shiftKey && dx === 0) {
-    dx = dy;
-    dy = 0;
-  }
-
-  if (deltaMode === WheelEvent.DOM_DELTA_LINE) {
-    dx *= lineMultiplier;
-    dy *= lineMultiplier;
-  } else if (deltaMode === WheelEvent.DOM_DELTA_PAGE) {
-    dx *= pageMultiplier;
-    dy *= pageMultiplier;
-  }
-
-  return [limit(dx, maxMultiplier), limit(dy, maxMultiplier)];
-};
+import type { Coords, Gesture, GestureCallbacks, NormalizedWheelEvent } from "./types";
 
 const midpoint = ([t1, t2]: TouchList): Coords => ({
   x: (t1.clientX + t2.clientX) / 2,
@@ -72,44 +47,32 @@ export const clientToSVGElementCoords = (el: SVGSVGElement, coords: Coords): Coo
 export const twoFingers = (
   container: Element,
   { onGestureStart, onGestureChange, onGestureEnd }: GestureCallbacks = {},
-  getWheelConfig?: () => WheelConfig,
+  normalizeWheelEvent: (event: WheelEvent) => NormalizedWheelEvent,
 ): (() => void) => {
-  // note: may expose in the future if needed
-  const deltaConfig: DeltaConfig = {
-    lineMultiplier: 8,
-    pageMultiplier: 24,
-    maxMultiplier: 24,
-  };
-
   // TODO: we shouldn't be reusing gesture
   let gesture: Gesture | undefined = undefined;
   let timer: number;
 
-  const wheelListener = (e: WheelEvent) => {
-    e.preventDefault();
+  const wheelListener = (event: WheelEvent) => {
+    event.preventDefault();
 
-    const { scaleSpeedup, translationSpeedUp } = getWheelConfig?.() ?? {
-      scaleSpeedup: 2,
-      translationSpeedUp: 2,
-    };
-
-    const [dx, dy] = normalizeWheel(e, deltaConfig);
+    const { dx, dy } = normalizeWheelEvent(event);
 
     if (!gesture) {
       gesture = {
         scale: 1,
         translation: { x: 0, y: 0 },
-        origin: { x: e.clientX, y: e.clientY },
+        origin: { x: event.clientX, y: event.clientY },
       };
       onGestureStart?.(gesture);
     } else {
       gesture = {
-        origin: { x: e.clientX, y: e.clientY },
-        scale: e.ctrlKey ? gesture.scale * (1 - (scaleSpeedup * dy) / 100) : 1,
-        translation: !e.ctrlKey
+        origin: { x: event.clientX, y: event.clientY },
+        scale: event.ctrlKey ? gesture.scale * (1 - dy / 100) : 1,
+        translation: !event.ctrlKey
           ? {
-              x: gesture.translation.x - translationSpeedUp * dx,
-              y: gesture.translation.y - translationSpeedUp * dy,
+              x: gesture.translation.x - dx,
+              y: gesture.translation.y - dy,
             }
           : { x: 0, y: 0 },
       };
