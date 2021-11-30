@@ -1,9 +1,8 @@
 {
   "name": "@skilitics/two-fingers",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Normalize two fingers gestures on the web.",
   "main": "lib",
-  "type": "module",
   "scripts": {
     "lint": "eslint 'src/**/*.ts'",
     "test": "echo \"Error: no test specified\" && exit 1",

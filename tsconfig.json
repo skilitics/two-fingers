@@ -1,8 +1,8 @@
 {
 	"include": ["src"],
 	"compilerOptions": {
-		"target": "ES2019",
-		"module": "es2015",
+		"target": "es2019",
+		"module": "commonjs",
 		"declaration": true,
 		"outDir": "./lib",
 		"strict": true,
