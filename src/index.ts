@@ -53,7 +53,12 @@ export const twoFingers = (
   let gesture: Gesture | undefined = undefined;
   let timer: number;
 
-  const wheelListener = (event: WheelEvent) => {
+  const wheelListener = (event: Event) => {
+    if (!(event instanceof WheelEvent)) {
+      console.error("Expected WheelEvent, got", event);
+      return;
+    }
+
     event.preventDefault();
 
     const { dx, dy } = normalizeWheelEvent(event);
@@ -149,7 +154,7 @@ export const twoFingers = (
     }
   };
 
-  document.addEventListener("wheel", wheelListener, { passive: false });
+  container.addEventListener("wheel", wheelListener, { passive: false });
   container.addEventListener("touchstart", watchTouches, { passive: false });
 
   /*
@@ -194,7 +199,7 @@ export const twoFingers = (
   }
 
   return () => {
-    document.removeEventListener("wheel", wheelListener);
+    container.removeEventListener("wheel", wheelListener);
     container.removeEventListener("touchstart", watchTouches);
 
     if (typeof window.GestureEvent !== "undefined" && typeof window.TouchEvent === "undefined") {
