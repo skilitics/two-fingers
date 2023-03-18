@@ -44,10 +44,39 @@ export const clientToSVGElementCoords = (el: SVGSVGElement, coords: Coords): Coo
   return point.matrixTransform(screenToElement);
 };
 
+function limit(delta: number, max_delta: number) {
+  return Math.sign(delta) * Math.min(max_delta, Math.abs(delta));
+}
+
+function normalizeWheel(e: WheelEvent) {
+  const DELTA_LINE_MULTIPLIER = 8;
+  const DELTA_PAGE_MULTIPLIER = 24;
+  const MAX_WHEEL_DELTA = 24;
+  
+  let dx = e.deltaX;
+  let dy = e.deltaY;
+  
+  if (e.shiftKey && dx === 0) {
+    [dx, dy] = [dy, dx];
+  }
+  
+  if (e.deltaMode === WheelEvent.DOM_DELTA_LINE) {
+    dx *= DELTA_LINE_MULTIPLIER;
+    dy *= DELTA_LINE_MULTIPLIER;
+  } else if (e.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
+    dx *= DELTA_PAGE_MULTIPLIER;
+    dy *= DELTA_PAGE_MULTIPLIER;
+  }
+  return {
+    dx: limit(dx, MAX_WHEEL_DELTA),
+    dy: limit(dy, MAX_WHEEL_DELTA),
+  };
+}
+
 export const twoFingers = (
   container: Element,
   { onGestureStart, onGestureChange, onGestureEnd }: GestureCallbacks = {},
-  normalizeWheelEvent: (event: WheelEvent) => NormalizedWheelEvent,
+  normalizeWheelEvent: (event: WheelEvent) => NormalizedWheelEvent = normalizeWheel,
 ): (() => void) => {
   // TODO: we shouldn't be reusing gesture
   let gesture: Gesture | undefined = undefined;
