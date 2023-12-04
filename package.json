@@ -1,17 +1,14 @@
 {
-  "name": "@skilitics/two-fingers",
+  "name": "@skilitics-public/two-fingers",
   "version": "2.1.0",
   "description": "Normalize two fingers gestures on the web.",
   "main": "lib",
-  "scripts": {
-    "lint": "eslint 'src/**/*.ts'",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "prepare": "tsc",
-    "compile": "tsc"
-  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/skilitics/two-fingers.git"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/"
   },
   "author": "Skilitics",
   "license": "MIT",
@@ -19,6 +16,14 @@
     "url": "https://github.com/skilitics/two-fingers/issues"
   },
   "homepage": "https://github.com/skilitics/two-fingers#readme",
+  "volta": {
+    "node": "20.10.0",
+    "pnpm": "8.11.0"
+  },
+  "scripts": {
+    "lint": "eslint \"src/**/*.ts\"",
+    "prepare": "tsc"
+  },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^4.16.1",
     "@typescript-eslint/parser": "^4.16.1",
@@ -29,9 +34,6 @@
   "files": [
     "lib"
   ],
-  "directories": {
-    "lib": "lib"
-  },
   "keywords": [
     "gesture"
   ]
