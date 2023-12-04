@@ -17,11 +17,15 @@ This package tries to unify these interactions and inconsistencies to expose a s
 
 ### Installation
 ```
-npm i @skilitics/two-fingers
+npm i @skilitics-public/two-fingers
 ```
 OR
 ```
-yarn add @skilitics/two-fingers
+yarn add @skilitics-public/two-fingers
+```
+OR
+```
+pnpm add @skilitics-public/two-fingers
 ```
 
 ### API
@@ -29,6 +33,8 @@ The API takes inspiration from Apple's [`GestureEvent` specification](https://de
 
 ##### Usage
 ```javascript
+import { twoFingers } from "@skilitics-public/two-fingers";
+
 const myDiv = document.querySelector('#myDiv');
 const unregister = twoFingers(myDiv, {
   onGestureStart: (g) => console.log(`Gesture start. Gesture: ${g.toString()}`),
